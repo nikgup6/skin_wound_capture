@@ -10,7 +10,7 @@ let isPredicting = false;
 // Labels for the quality classes
 const labels = ['good_quality', 'blurry', 'too_dark', 'poor_framing'];
 
-// Step 1: Initialize ONNX.js and load the model
+// Step 1: Initialize ONNX.js
 async function initializeModel() {
     try {
         session = new onnx.InferenceSession();
@@ -51,21 +51,28 @@ async function startPredictionLoop() {
     }
     isPredicting = true;
     
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 224;
-    canvas.height = 224;
-
     const runInference = async () => {
         try {
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            // Use tf.browser.fromPixels to get a tensor directly from the video frame
+            const imageTensor = tf.browser.fromPixels(video)
+                .resizeBilinear([224, 224])
+                .toFloat()
+                .div(tf.scalar(255.0))
+                .sub(tf.tensor1d([0.485, 0.456, 0.406]))
+                .div(tf.tensor1d([0.229, 0.224, 0.225]))
+                .expandDims();
+                
+            // Transpose the tensor from [1, 224, 224, 3] to [1, 3, 224, 224] for ONNX
+            const transposedTensor = imageTensor.transpose([0, 3, 1, 2]);
 
-            // Preprocess the image for the model
-            const inputTensor = preprocess(imageData);
+            // Convert the tf.js tensor to a raw Float32Array
+            const rawTensorData = await transposedTensor.data();
+            
+            // Create the ONNX tensor
+            const onnxTensor = new onnx.Tensor(rawTensorData, 'float32', [1, 3, 224, 224]);
             
             // Run the model prediction
-            const outputMap = await session.run([inputTensor]);
+            const outputMap = await session.run([onnxTensor]);
             const outputTensor = outputMap.values().next().value;
             
             // Get the predicted class
@@ -79,37 +86,15 @@ async function startPredictionLoop() {
             console.error("Prediction failed:", e);
         }
 
+        // Clean up the tensors to prevent memory leaks
+        tf.dispose();
+
         // Loop the prediction
         requestAnimationFrame(runInference);
     };
 
     runInference();
 }
-
-// Step 4: Final Corrected Preprocessing function
-function preprocess(imageData) {
-    const { data, width, height } = imageData;
-    const mean = [0.485, 0.456, 0.406];
-    const std = [0.229, 0.224, 0.225];
-    
-    // Create a new Float32Array to store the preprocessed data
-    const tensorData = new Float32Array(3 * width * height);
-    
-    let offset = 0;
-    for (let h = 0; h < height; h++) {
-        for (let w = 0; w < width; w++) {
-            const index = (h * width + w) * 4;
-            // Normalize the pixel value and place it in the tensor
-            tensorData[offset++] = (data[index + 0] / 255.0 - mean[0]) / std[0]; // Red
-            tensorData[offset++] = (data[index + 1] / 255.0 - mean[1]) / std[1]; // Green
-            tensorData[offset++] = (data[index + 2] / 255.0 - mean[2]) / std[2]; // Blue
-        }
-    }
-    
-    // Create and return the ONNX tensor
-    return new onnx.Tensor(tensorData, 'float32', [1, 3, height, width]);
-}
-
 
 // Helper to find the index of the max value
 function argmax(array) {
@@ -124,7 +109,7 @@ function argmax(array) {
     return maxIndex;
 }
 
-// Step 5: Update the UI based on the prediction
+// Step 4: Update the UI based on the prediction
 function updateUI(predictedLabel) {
     if (predictedLabel === 'good_quality') {
         overlayMessage.style.display = 'none';
