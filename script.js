@@ -125,7 +125,7 @@ function updateUI(predictedLabel) {
         // If the image is not good, show the message
         overlayMessage.textContent = `🚫 ${predictedLabel.replace('_', ' ')} detected!`;
         overlayMessage.style.display = 'block';
-        captureButton.textContent = 'Take Anyway';
+        captureButton.textContent = 'Take Picture';
         
         // Check for the timer
         if (poorQualityStartTime === null) {
