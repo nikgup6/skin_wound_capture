@@ -10,6 +10,10 @@ let isPredicting = false;
 // Labels for the quality classes
 const labels = ['good_quality', 'blurry', 'too_dark', 'poor_framing'];
 
+// New variables for the timer logic
+const TIMEOUT_SECONDS = 20;
+let poorQualityStartTime = null;
+
 // Step 1: Initialize ONNX.js
 async function initializeModel() {
     try {
@@ -109,16 +113,36 @@ function argmax(array) {
     return maxIndex;
 }
 
-// Step 4: Update the UI based on the prediction
+// Step 4: Updated UI logic with the new timer feature
 function updateUI(predictedLabel) {
+    // If the image is good, reset the timer and display no message
     if (predictedLabel === 'good_quality') {
         overlayMessage.style.display = 'none';
-        captureButton.disabled = false;
         captureButton.textContent = 'Take Picture';
+        captureButton.disabled = false;
+        poorQualityStartTime = null;
     } else {
+        // If the image is not good, show the message
         overlayMessage.textContent = `🚫 ${predictedLabel.replace('_', ' ')} detected!`;
         overlayMessage.style.display = 'block';
-        captureButton.disabled = true;
+        captureButton.textContent = 'Take Anyway';
+        
+        // Check for the timer
+        if (poorQualityStartTime === null) {
+            // Start the timer when the first poor quality frame is detected
+            poorQualityStartTime = Date.now();
+        }
+
+        const elapsedSeconds = (Date.now() - poorQualityStartTime) / 1000;
+        
+        if (elapsedSeconds >= TIMEOUT_SECONDS) {
+            // After the timeout, remove the message and enable the button
+            overlayMessage.textContent = 'You can take the picture now.';
+            captureButton.disabled = false;
+        } else {
+            // Before the timeout, keep the button disabled
+            captureButton.disabled = true;
+        }
     }
 }
 

@@ -44,14 +44,13 @@ h1 {
 }
 
 .overlay-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 1.5rem;
-    color: white;
-    background-color: rgba(0, 0, 0, 0.5);
+    width: 100%;
     padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #555;
+    background-color: #e2e8f0;
     border-radius: 6px;
     display: none; /* Hidden by default */
 }
